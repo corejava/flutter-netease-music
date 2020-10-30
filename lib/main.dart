@@ -1,8 +1,13 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:hive/hive.dart';
+import 'package:logging/logging.dart';
 import 'package:music_player/music_player.dart';
 import 'package:netease_music_api/netease_cloud_music.dart' as api;
 import 'package:overlay_support/overlay_support.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:quiet/component.dart';
 import 'package:quiet/component/route.dart';
 import 'package:quiet/material/app.dart';
 import 'package:quiet/pages/account/account.dart';
@@ -21,14 +26,24 @@ void main() {
   WidgetsFlutterBinding.ensureInitialized();
   neteaseRepository = NeteaseRepository();
   api.debugPrint = debugPrint;
+  Logger.root.onRecord.listen((record) {
+    debugPrint('${record.time} ${record.level.name} ${record.loggerName}: ${record.message}');
+  });
   runApp(PageSplash(
     futures: [
       SharedPreferences.getInstance(),
       UserAccount.getPersistenceUser(),
+      getApplicationDocumentsDirectory().then((dir) {
+        Hive.init(dir.path);
+        return Hive.openBox<Map>("player");
+      }),
     ],
     builder: (context, data) {
-      final setting = Settings(data[0]);
-      return MyApp(setting: setting, user: data[1]);
+      return MyApp(
+        setting: Settings(data[0]),
+        user: data[1],
+        player: data[2],
+      );
     },
   ));
 }
@@ -52,7 +67,9 @@ class MyApp extends StatelessWidget {
 
   final Map user;
 
-  const MyApp({Key key, @required this.setting, @required this.user}) : super(key: key);
+  final Box<Map> player;
+
+  const MyApp({Key key, @required this.setting, @required this.user, this.player}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -62,12 +79,19 @@ class MyApp extends StatelessWidget {
         return Netease(
           user: user,
           child: Quiet(
+            box: player,
             child: CopyRightOverlay(
               child: OverlaySupport(
                 child: MaterialApp(
                   routes: routes,
                   onGenerateRoute: routeFactory,
                   title: 'Quiet',
+                  supportedLocales: [const Locale("en"), const Locale("zh")],
+                  localizationsDelegates: [
+                    GlobalWidgetsLocalizations.delegate,
+                    GlobalMaterialLocalizations.delegate,
+                    QuietLocalizationsDelegate(),
+                  ],
                   theme: setting.theme,
                   darkTheme: setting.darkTheme,
                   themeMode: setting.themeMode,

@@ -8,6 +8,7 @@ import 'package:quiet/pages/welcome/login_sub_navigation.dart';
 import 'package:quiet/part/part.dart';
 
 import '_repository.dart';
+import 'page_dia_code_selection.dart';
 
 class PageLoginWithPhone extends StatefulWidget {
   @override
@@ -43,8 +44,9 @@ class _PageLoginWithPhoneState extends State<PageLoginWithPhone> {
         ),
       ),
       body: Loader<_InputModel>(
-        loadTask: () =>
-            WelcomeRepository.getRegions().then((value) => Result.value(_InputModel(value, _phoneInputController))),
+        loadTask: () => WelcomeRepository.getRegions().then((value) {
+          return Result.value(_InputModel(value, _phoneInputController));
+        }),
         builder: (context, data) {
           return ScopedModel<_InputModel>(
             model: data,
@@ -80,7 +82,7 @@ class _InputModel extends Model {
 
   _InputModel(this.flags, this.phoneInputController) {
     final countryCode = window.locale.countryCode;
-    final region = flags.firstWhere((region) => region.code == countryCode) ?? flags[0];
+    final region = flags.firstWhere((region) => region.code == countryCode, orElse: () => flags[0]);
     _region = region;
   }
 
@@ -129,8 +131,12 @@ class _PhoneInput extends StatelessWidget {
         decoration: InputDecoration(
           prefixIcon: InkWell(
             onTap: () async {
-              final region = await showDialog<RegionFlag>(
-                  context: context, builder: (context) => _RegionSelectionDialog(regions: inputModel.flags));
+              final RegionFlag region = await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) {
+                  return RegionSelectionPage(regions: inputModel.flags);
+                }),
+              );
               if (region != null) {
                 inputModel.region = region;
               }
@@ -141,34 +147,6 @@ class _PhoneInput extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _RegionSelectionDialog extends StatelessWidget {
-  final List<RegionFlag> regions;
-
-  const _RegionSelectionDialog({Key key, @required this.regions}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      child: ListTileTheme(
-        style: ListTileStyle.drawer,
-        child: ListView.builder(
-            itemCount: regions.length,
-            itemBuilder: (context, index) {
-              final region = regions[index];
-              return ListTile(
-                leading: Text(region.emoji),
-                title: Text(region.name),
-                trailing: Text(region.dialCode),
-                onTap: () {
-                  Navigator.of(context).pop(region);
-                },
-              );
-            }),
       ),
     );
   }
